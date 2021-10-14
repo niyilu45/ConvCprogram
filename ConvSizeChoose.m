@@ -4,9 +4,10 @@ function ConvSizeChoose
     rng(0);
     drawComplexityEn = false;
 
-a = rand(90000,1);
-b = rand(2048,1);
+a = rand(10,1);
+b = rand(3,1);
 c = conv(a,b);
+d = rand(25,1);
 fid=fopen('SeqConvInA.txt','w');
 fprintf(fid, '%f\n',a);
 fclose(fid);
@@ -15,6 +16,9 @@ fprintf(fid, '%f\n',b);
 fclose(fid);
 fid=fopen('SeqConvOutC.txt','w');
 fprintf(fid, '%f\n',c);
+fclose(fid);
+fid=fopen('SeqConvInD.txt','w');
+fprintf(fid, '%f\n',d);
 fclose(fid);
 % save('SeqConvInA.txt', 'a', '-ascii');
 % save('SeqConvInB.txt', 'b', '-ascii');

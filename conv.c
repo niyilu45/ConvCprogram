@@ -143,3 +143,125 @@ int CalcFFTSize(int InputLen){
     int FFTLen = 1 << (int)ceil((log(InputLen)/log(2)));
     return FFTLen;
 }
+
+
+void Filter(double* pdB, double* pdA, double* pdTxSignal, int ulTxSignalLen, int ulBLen, int ulALen){
+    double* pdRxSignal;
+    int ulIndex0, ulIndex1;
+    int ulMinLen, ulMaxLen;
+    pdRxSignal = (double *)malloc(ulTxSignalLen * sizeof(double));
+
+    if(ulBLen > ulALen){
+        ulMinLen = ulALen;
+        ulMaxLen = ulBLen;
+    }
+    else {
+        ulMinLen = ulBLen;
+        ulMaxLen = ulALen;
+
+    }
+    for (ulIndex0 = 0; ulIndex0 < ulMaxLen; ulIndex0++) {
+        pdRxSignal[ulIndex0] = pdB[0] * pdTxSignal[ulIndex0];
+        for ( ulIndex1 = 1; ulIndex1 < ulIndex0 + 1; ulIndex1++) {
+            if (ulIndex0 < ulMinLen) {
+                pdRxSignal[ulIndex0] += pdB[ulIndex1] * pdTxSignal[ulIndex0 - ulIndex1] - pdA[ulIndex1] * pdRxSignal[ulIndex0 - ulIndex1];
+            }
+            else {
+                if (ulBLen < ulALen) {
+                    pdRxSignal[ulIndex0] += - pdA[ulIndex1] * pdRxSignal[ulIndex0 - ulIndex1];
+                }
+                else if(ulBLen > ulALen){
+                    pdRxSignal[ulIndex0] += pdB[ulIndex1] * pdTxSignal[ulIndex0 - ulIndex1];
+                }
+                else {
+                }
+            }
+        }
+    }
+    for ( ; ulIndex0 < ulTxSignalLen; ulIndex0++) {
+        pdRxSignal[ulIndex0] = pdB[0] * pdTxSignal[ulIndex0];
+        for (ulIndex1 = 1; ulIndex1 < ulMaxLen; ulIndex1++) {
+            if (ulIndex0 < ulMinLen) {
+                pdRxSignal[ulIndex0] += pdB[ulIndex1] * pdTxSignal[ulIndex0 - ulIndex1] - pdA[ulIndex1] * pdRxSignal[ulIndex0 - ulIndex1];
+            }
+            else {
+                if (ulBLen < ulALen) {
+                    pdRxSignal[ulIndex0] += - pdA[ulIndex1] * pdRxSignal[ulIndex0 - ulIndex1];
+                }
+                else if(ulBLen > ulALen){
+                    pdRxSignal[ulIndex0] += pdB[ulIndex1] * pdTxSignal[ulIndex0 - ulIndex1];
+                }
+                else {
+                }
+            }
+        }
+
+    }
+
+    for (int i = 0; i < ulTxSignalLen; i++) {
+        pdTxSignal[i] = pdRxSignal[i];
+    }
+    free(pdRxSignal);
+    return;
+}
+void ReFilter(double* pdB, double* pdA, double* pdTxSignal, int ulTxSignalLen, int ulBLen, int ulALen){
+    double* pdRxSignal;
+    int ulIndex0, ulIndex1;
+    int ulMinLen, ulMaxLen;
+    pdRxSignal = (double *)malloc(ulTxSignalLen * sizeof(double));
+
+    if(ulBLen > ulALen){
+        ulMinLen = ulALen;
+        ulMaxLen = ulBLen;
+    }
+    else {
+        ulMinLen = ulBLen;
+        ulMaxLen = ulALen;
+
+    }
+    int convOutLen = ulBLen + ulTxSignalLen - 1;
+    double* convOut = (double *)calloc(convOutLen, sizeof(double));
+    DirectConv(convOut, pdB, ulBLen, pdTxSignal, ulTxSignalLen);
+    memcpy(pdRxSignal, convOut, sizeof(double) * ulTxSignalLen);
+
+    free(convOut);
+    for (ulIndex0 = 0; ulIndex0 < ulMaxLen; ulIndex0++) {
+        for ( ulIndex1 = 1; ulIndex1 < ulIndex0 + 1; ulIndex1++) {
+            if (ulIndex0 < ulMinLen) {
+                pdRxSignal[ulIndex0] += - pdA[ulIndex1] * pdRxSignal[ulIndex0 - ulIndex1];
+            }
+            else {
+                if (ulBLen < ulALen) {
+                    pdRxSignal[ulIndex0] += - pdA[ulIndex1] * pdRxSignal[ulIndex0 - ulIndex1];
+                }
+                else if(ulBLen > ulALen){
+                }
+                else {
+                }
+            }
+        }
+    }
+    for ( ; ulIndex0 < ulTxSignalLen; ulIndex0++) {
+        for (ulIndex1 = 1; ulIndex1 < ulMaxLen; ulIndex1++) {
+            if (ulIndex0 < ulMinLen) {
+                pdRxSignal[ulIndex0] += - pdA[ulIndex1] * pdRxSignal[ulIndex0 - ulIndex1];
+            }
+            else {
+                if (ulBLen < ulALen) {
+                    pdRxSignal[ulIndex0] += - pdA[ulIndex1] * pdRxSignal[ulIndex0 - ulIndex1];
+                }
+                else if(ulBLen > ulALen){
+                }
+                else {
+                }
+            }
+        }
+
+    }
+
+    for (int i = 0; i < ulTxSignalLen; i++) {
+        pdTxSignal[i] = pdRxSignal[i];
+    }
+    free(pdRxSignal);
+    return;
+}
