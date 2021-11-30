@@ -7,7 +7,12 @@ function ConvSizeChoose
     figMapEn    = true;
     border = 512;
 
+    x1 = [1451;34562;25124;2652;1414;6346];
+    x2 = [5151;125;61346;7247;124;62;1616;3146];
+    y = conv(x1, x2);
 
+[convOut] = SegFFTConv(x1, x2);
+error('auto stop');
     if dataCheckEn
         c1            = DirectConvComplexity(512, 100);
         [c2, fftSize] = SegFFTConvComplexity(512, 100);
@@ -79,5 +84,39 @@ function [c, FFTSize] = SegFFTConvComplexity(n1, n2)
     complexity = 3 * ((2*segs+1) .* fftSize .* fftOrder / 2 + segs .* fftSize); %multiPerComplexNum*times*nlogn/2+multiNum
     [c, idx] = min(complexity);
     FFTSize = fftSize(idx);
+end
+
+function [convOut] = SegFFTConv(x1, x2)
+    % 1) Calc the output length and choose the fft size.
+    [x1SizeM, x1SizeN] = size(x1);
+    [x2SizeM, x2SizeN] = size(x2);
+    if x2SizeM > x1SizeM
+        tmp = x1;
+        x1  = x2;
+        x2  = tmp;
+        [x1SizeM, x1SizeN] = size(x1);
+        [x2SizeM, x2SizeN] = size(x2);
+    end
+    [~, fftSize] = SegFFTConvComplexity(x1SizeM, x2SizeM);
+    convOutLen = x1SizeM + x2SizeM - 1;
+
+    % 2) segment fft conv.
+    idx = 1;
+    block = fftSize + 1 - x2SizeM;
+    segs = ceil(x1SizeM / block);
+    convOutLenTmp = convOutLen + segs*block-x1SizeM;
+    convOut = zeros(convOutLenTmp, 1);
+    x1 = [x1; zeros(segs*block-x1SizeM, 1)];
+    X2 = fft(x2, fftSize);
+    for i = 1:segs
+        % maybe the reason is that x1 need more zeros, then this part segment conv seq exceed the convOutlen
+        % so we should guarantee that the conv out result correct firstly.
+        sX1 = fft(x1(idx:idx+block-1, 1), fftSize);
+        sY = sX1 .* X2;
+        sy = ifft(sY, fftSize);
+        convOut(idx:idx+fftSize-1, 1) = convOut(idx:idx+fftSize-1, 1) + sy;
+        idx = idx + block;
+    end
+    convOut = convOut(1:convOutLen);
 end
 
