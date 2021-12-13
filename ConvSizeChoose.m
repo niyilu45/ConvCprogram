@@ -11,11 +11,11 @@ function ConvSizeChoose
     x2 = [5151;125;61346;7247;124;62;1616;3146];
     y = conv(x1, x2);
 
-[convOut] = SegFFTConv(x1, x2);
-error('auto stop');
+% [convOut] = SegFFTConv(x1, x2);
+% error('auto stop');
     if dataCheckEn
-        c1            = DirectConvComplexity(512, 100);
-        [c2, fftSize] = SegFFTConvComplexity(512, 100);
+        c1            = DirectConvComplexity(100, 12);
+        [c2, fftSize] = SegFFTConvComplexity(100, 12);
     end
 
     cTable = zeros(border, border); % complexity ratio.
@@ -28,7 +28,7 @@ error('auto stop');
             cTable(n1, n2) = c1 / c2;
             rTable(n1, n2) = c1 > c2;
             sTable(n1, n2) = fftSize;
-            cTable(n2, n1) = cTable(n1, n2);
+            cTable(n2, n1) = cTable(n1, n2); 
             rTable(n2, n1) = rTable(n1, n2);
             sTable(n2, n1) = sTable(n1, n2);
         end
@@ -38,7 +38,8 @@ error('auto stop');
         figure
         [AxisX, AxisY] = meshgrid(1:border, 1:border);
         Color = AxisX .* AxisY;
-        surf(AxisX, AxisY, cTable, Color);
+%         surf(AxisX, AxisY, cTable, Color);
+        surf(AxisX, AxisY, cTable);
         colorbar
         shading interp
     end

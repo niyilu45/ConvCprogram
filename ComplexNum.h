@@ -7,11 +7,12 @@
 
 #ifndef COMPLEXNUM
 #define COMPLEXNUM
-typedef struct ComplexNum
+typedef struct ComplexNumStru
 {
     double re;
     double im;
-} ComplexNum;
+} ComplexNumStru;
+typedef struct ComplexNumStru ComplexNum;
 #endif
 
 ComplexNum ComplexNumReset(void);

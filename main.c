@@ -13,8 +13,10 @@ int main(int argc, char* argv[])
     double* in1;
     double* in2;
     double* out;
+    printf("FFTSize=%d\n", CalcFFTStateNum(511));
 
 
+    return 0;
     len1 = FileReadDouble(&in1, "SeqConvInA.txt");
     len2 = FileReadDouble(&in2, "SeqConvInB.txt");
     len3 = FileReadDouble(&out, "SeqConvOutC.txt");
@@ -59,13 +61,11 @@ int main(int argc, char* argv[])
 
     double* in4;
     int len4 = FileReadDouble(&in4, "SeqConvInD.txt");
-    Filter(in1, in2, in4, len4, len1, len2);
     for (int i = 0; i < 20; i++) {
         printf("in4[%d]=%f\n",i,in4[i]);
     }
     double* in5;
     int len5 = FileReadDouble(&in5, "SeqConvInD.txt");
-    ReFilter(in1, in2, in5, len5, len1, len2);
     for (int i = 0; i < 20; i++) {
         printf("in5[%d]=%f\n",i,in5[i]);
     }

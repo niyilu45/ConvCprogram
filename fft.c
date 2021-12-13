@@ -1,152 +1,126 @@
 #include "fft.h"
 
-OmegaLibList OmegaLib = NULL;
+OmegaLibList omegaLib = NULL;
 
-ComplexNum* FFT(ComplexNum* Input, int InputLen){
-    if(InputLen <= 0){
-        return NULL;
+void FFT(ComplexNum* output, ComplexNum* input, int inputLen){
+    if(inputLen <= 0){
+        return;
     }
 
-    int i,j,k;
-    // Check the FFTLen.
-    int StateNum = CalFFTStateNum(InputLen);
-    int FFTLen = CalFFTLen(InputLen);
+    // Check the fftLen.
+    int stateNum = CalcFFTStateNum(inputLen);
+    int fftLen = CalcFFTLen(inputLen);
 
-    if(InputLen != FFTLen){
-        printf("\r\nFFT Err! Do not support none pow of 2 points!");
+    if(inputLen != fftLen){
+        printf("\r\n[Error] in %s! Do not support none pow of 2 points!", __func__);
         exit(0);
     }
 
-    // 1) Prepare Omega.
-    ComplexNum* Omega;
-    OmegaLibList CurOmegaLib;
+    // 1) Prepare omega.
+    ComplexNum* omega;
+    OmegaLibList curOmegaLib;
 
-    while((CurOmegaLib = FindOmegaLib(FFTLen, OmegaLib)) == NULL){
-        OmegaLib = InsertOmegaLib(FFTLen, OmegaLib);
-    }
-    Omega = CurOmegaLib->Omega;
+    InsertOmegaLib(omegaLib, fftLen);
+    curOmegaLib = FindOmegaLib(fftLen, omegaLib);
+    omega = curOmegaLib->omega;
 
-    // 2) Change the Input Order.
-    ComplexNum* Output;
-    Output = FFTDataFlip(Input, FFTLen);
+    // 2) Change the input Order.
+    ComplexNum* outputTmp = (ComplexNum *)malloc(fftLen * sizeof(ComplexNum));
+    memcpy(outputTmp, input, fftLen * sizeof(ComplexNum));
+    FFTDataFlip(outputTmp, fftLen);
 
     // 3) Main Part.
-    int BlkSize, HalfBlkSize;
-    ComplexNum Temp;
-    ComplexNum AddTemp, SubTemp;
-    for(i=0;i<StateNum;i++){
-        BlkSize = 2<<i;
-        HalfBlkSize = 1<<i;
-        for(j=0;j<FFTLen;j+=BlkSize){
-            for(k=0;k<HalfBlkSize;k++){
-                Temp = ComplexMulInFFT(Output[j+k+HalfBlkSize], Omega[k*(FFTLen/BlkSize)]);
-                //AddTemp = ComplexAddInFFT(Output[j+k],Temp);
-                //SubTemp = ComplexSubInFFT(Output[j+k],Temp);
-                AddTemp.re = Output[j+k].re+Temp.re;
-                AddTemp.im = Output[j+k].im+Temp.im;
-                SubTemp.re = Output[j+k].re-Temp.re;
-                SubTemp.im = Output[j+k].im-Temp.im;
-                Output[j+k] = AddTemp;
-                Output[j+k+HalfBlkSize] = SubTemp;
+    int blkSize, halfBlkSize;
+    ComplexNum inA, inB;
+    ComplexNum mulTmp;
+    ComplexNum addTmp, subTmp;
+    double mulTmpA, mulTmpB, mulTmpC;
+    for(int i=0;i<stateNum;i++){
+        blkSize = 2<<i;
+        halfBlkSize = 1<<i;
+        for(int j=0;j<fftLen;j+=blkSize){
+            for(int k=0;k<halfBlkSize;k++){
+                // complex multiply
+                inA = outputTmp[j+k+halfBlkSize];
+                inB = omega[k*(fftLen/blkSize)];
+                mulTmpA = (inA.re + inA.im) * inB.re;
+                mulTmpB = (inB.re + inB.im) * inA.im;
+                mulTmpC = (inA.im - inA.re) * inB.im;
+                mulTmp.re = mulTmpA - mulTmpB;
+                mulTmp.im = mulTmpB - mulTmpC;
+
+                // complex add and sub.
+                addTmp.re = outputTmp[j+k].re+mulTmp.re;
+                addTmp.im = outputTmp[j+k].im+mulTmp.im;
+                subTmp.re = outputTmp[j+k].re-mulTmp.re;
+                subTmp.im = outputTmp[j+k].im-mulTmp.im;
+                outputTmp[j+k] = addTmp;
+                outputTmp[j+k+halfBlkSize] = subTmp;
             }
         }
 
     }
 
-    return Output;
+    memcpy(output, outputTmp, fftLen * sizeof(ComplexNum));
+    free(outputTmp);;
+    return;
 }
 
-ComplexNum* IFFT(ComplexNum* Input, int InputLen){
-    if(InputLen <= 0){
-        return NULL;
+void IFFT(ComplexNum* output, ComplexNum* input, int inputLen){
+    if(inputLen <= 0){
+        return;
     }
-    int i;
-    // Check the FFTLen.
-    int StateNum = CalFFTStateNum(InputLen);
-    int FFTLen = CalFFTLen(InputLen);
+    // Check the fftLen.
+    int stateNum = CalcFFTStateNum(inputLen);
+    int fftLen = CalcFFTLen(inputLen);
 
-    if(InputLen != FFTLen){
+    if(inputLen != fftLen){
         printf("\r\nFFT Err! Do not support none pow of 2 points!");
         exit(0);
     }
 
-    ComplexNum* InputTemp;
-    InputTemp = (ComplexNum*)malloc(sizeof(ComplexNum) * FFTLen);
-    for(i=0;i<FFTLen;i++){
-        InputTemp[i].re = Input[i].re;
-        InputTemp[i].im = -1*Input[i].im;
+    ComplexNum* inputTmp;
+    inputTmp = (ComplexNum*)malloc(sizeof(ComplexNum) * fftLen);
+    for(int i=0;i<fftLen;i++){
+        inputTmp[i].re = input[i].re;
+        inputTmp[i].im = -1*input[i].im;
     }
 
-    ComplexNum* Output;
-    Output = FFT(InputTemp, FFTLen);
+    FFT(inputTmp, inputTmp, fftLen);
 
-    for(i=0;i<FFTLen;i++){
-        Output[i].re /= FFTLen;
-        Output[i].im /= (-FFTLen);
+    for(int i=0;i<fftLen;i++){
+        output[i].re /= fftLen;
+        output[i].im /= (-fftLen);
     }
 
-    free(InputTemp);
-    InputTemp = NULL;
+    free(inputTmp);
+    inputTmp = NULL;
 
-    return Output;
+    return;
 }
 
 
-static ComplexNum CalOmega(int i, int N){
-    ComplexNum Omega;
-    Omega.re = cos(2*PI*i/N);
-    Omega.im = -sin(2*PI*i/N);
+static ComplexNum CalcOmega(int i, int N){
+    ComplexNum omega;
+    omega.re = cos(2*PI*i/N);
+    omega.im = -sin(2*PI*i/N);
 
-    return Omega;
+    return omega;
 }
 
-static ComplexNum ComplexAddInFFT(ComplexNum A, ComplexNum B){
-    ComplexNum Output;
+static void FFTDataFlip(ComplexNum* input, int inputLen){
+    int BitWidth = CalcFFTStateNum(inputLen);
+    unsigned int idx;
 
-    Output.re = A.re + B.re;
-    Output.im = A.im + B.im;
-
-    return Output;
-}
-static ComplexNum ComplexSubInFFT(ComplexNum A, ComplexNum B){
-    ComplexNum Output;
-
-    Output.re = A.re - B.re;
-    Output.im = A.im - B.im;
-
-    return Output;
-}
-
-static ComplexNum ComplexMulInFFT(ComplexNum A, ComplexNum B){
-    ComplexNum Output;
-
-    double tA = (A.re + A.im) * B.re;
-    double tB = (B.re + B.im) * A.im;
-    double tC = (A.im - A.re) * B.im;
-    Output.re = tA - tB;
-    Output.im = tB - tC;
-
-    return Output;
-}
-
-static ComplexNum* FFTDataFlip(ComplexNum* Input, int InputLen){
-    int i;
-    ComplexNum* FlipedData;
-    int BitWidth = CalFFTStateNum(InputLen);
-    unsigned int Idx;
-
-    FlipedData = (ComplexNum*)malloc(sizeof(ComplexNum) * InputLen);
-    for(i=0;i<InputLen;i++){
-        Idx = BitFlipInt(i, BitWidth);
-        FlipedData[Idx] = Input[i];
+    ComplexNum tmp;
+    for(int i=0;i<=inputLen/2;i++){
+        idx = BitFlipInt(i, BitWidth);
+        tmp = input[i];
+        input[i] = input[idx];
+        input[idx] = tmp;
     }
 
-    return FlipedData;
-}
-
-static int CalFFTStateNum(int InputLen){
-    int StateNum = (int)ceil((log(InputLen)/log(2)));
-    return StateNum;
+    return;
 }
 
 static unsigned int BitFlipInt(register unsigned int val, int BitWidth){
@@ -159,59 +133,51 @@ static unsigned int BitFlipInt(register unsigned int val, int BitWidth){
         val >>= (32-BitWidth);
     }
     else{
-        printf("BitFlip Err! Do not support this yet!\n");
+        printf("[Error] in %s! Do not support this yet!\n", __func__);
         exit(0);
     }
 
     return val;
 }
 
-static OmegaLibList FindOmegaLib(int FFTLen, OmegaLibList Head){
-    OmegaLibList L;
-    L = Head;
+static OmegaLibList FindOmegaLib(int fftLen, OmegaLibList head){
+    OmegaLibList L = head;
     while(L != NULL){
-        if(L->Len == FFTLen){
+        if(L->len == fftLen){
             return L;
         }
-        L = L->Next;
+        L = L->next;
     }
 
     return NULL;
 }
 
-static OmegaLibList InsertOmegaLib(int FFTLen, OmegaLibList L){
+static void InsertOmegaLib(OmegaLibList L, int fftLen){
+    // 1) if find the end of the list, create new.
     if(L == NULL){
         L = (OmegaLibList)calloc(1, sizeof(OmegaLibNode));
-        L->Next = NULL;
-        L->Len = FFTLen;
-        L->Omega = CalcOmegaLib(FFTLen);
-        return L;
+        L->next = NULL;
+        L->len = fftLen;
+        L->omega = (ComplexNum *)malloc(fftLen * sizeof(ComplexNum));
+        CalcOmegaLib(L->omega, fftLen);
+        return;
     }
 
-    if(L->Len == FFTLen){
-        return L;
+    // 2) if this len is already exist, skip.
+    if(L->len == fftLen){
+        return;
     }
 
-    L->Next = InsertOmegaLib(FFTLen, L->Next);
-
-    return L;
+    // 3) find next list node.
+    InsertOmegaLib(L->next, fftLen);
+    return;
 }
 
-static ComplexNum* CalcOmegaLib(int FFTLen){
-    int i;
-    ComplexNum* Omega;
-    Omega = (ComplexNum*)malloc(sizeof(ComplexNum) * FFTLen);
-
-    for(i=0;i<FFTLen;i++){
-        Omega[i].re = cos(2*PI*i/FFTLen);
-        Omega[i].im = sin(-2*PI*i/FFTLen);
+static void CalcOmegaLib(ComplexNum* omega, int len){
+    for(int i=0;i<len;i++){
+        omega[i].re = cos(2*PI*i/len);
+        omega[i].im = sin(-2*PI*i/len);
     }
-
-    return Omega;
-}
-
-void ClearOmegaLib(void){
-    OmegaLib = DestroyOmegaLib(OmegaLib);
     return;
 }
 
@@ -220,15 +186,42 @@ static OmegaLibList DestroyOmegaLib(OmegaLibList L){
         return NULL;
     }
 
-    L->Next = DestroyOmegaLib(L->Next);
-    free(L->Omega);
-    L->Omega = NULL;
+    L->next = DestroyOmegaLib(L->next);
+    free(L->omega);
+    L->omega = NULL;
     free(L);
 
     return NULL;
 }
 
-int CalFFTLen(int InputLen){
-    int FFTLen = 1 << (int)ceil((log(InputLen)/log(2)));
-    return FFTLen;
+void ClearOmegaLib(void){
+    omegaLib = DestroyOmegaLib(omegaLib);
+    return;
+}
+
+static int CalcFFTStateNum(int inputLen){
+    int stateNum = 0;
+    while (inputLen) {
+        inputLen >>= 1;
+        stateNum++;
+    }
+    return stateNum;
+}
+
+int CalcFFTOrder(int inputLen){
+    int fftOrder = 0;
+    while (inputLen) {
+        inputLen >>= 1;
+        fftOrder++;
+    }
+    return fftOrder;
+}
+
+int CalcFFTLen(int inputLen){
+    int fftOrder = 0;
+    while (inputLen) {
+        inputLen >>= 1;
+        fftOrder++;
+    }
+    return 1 << fftOrder;
 }

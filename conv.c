@@ -31,12 +31,11 @@ void ConvDouble(double* output, double* input){
     return;
 }
 void DirectConv(double* output, double* input1, int inputLen1, double* input2, int inputLen2){
-    int i,j;
     int convOutLen = inputLen1 + inputLen2 - 1;
     double* convOutTmp;
     convOutTmp = (double *)calloc(convOutLen, sizeof(double));
-    for(i=0;i<inputLen1;i++){
-        for (j = 0; j < inputLen2; j++) {
+    for(int i=0;i<inputLen1;i++){
+        for (int j = 0; j < inputLen2; j++) {
             convOutTmp[i+j] += input1[i] * input2[j];
         }
     }
@@ -45,38 +44,12 @@ void DirectConv(double* output, double* input1, int inputLen1, double* input2, i
     convOutTmp = NULL;
     return;
 }
-void FFTConvComplex(ComplexNum* output, ComplexNum* input1, int inputLen1, ComplexNum* input2, int inputLen2){
-    int convOutLen = inputLen1 + inputLen2 - 1;
-    int fftLen = CalcFFTSize(convOutLen);
-    ComplexNum* x1 = (ComplexNum *)calloc(fftLen, sizeof(ComplexNum));
-    ComplexNum* x2 = (ComplexNum *)calloc(fftLen, sizeof(ComplexNum));
-    memcpy(x1, input1, sizeof(ComplexNum) * inputLen1);
-    memcpy(x2, input2, sizeof(ComplexNum) * inputLen2);
-    ComplexNum* X1 = FFT(x1, fftLen);
-    ComplexNum* X2 = FFT(x2, fftLen);
-    ComplexNum* Y = (ComplexNum *)calloc(fftLen, sizeof(ComplexNum));
-    for (int i = 0; i < fftLen; i++) {
-        double A = (X1[i].re + X1[i].im) * X2[i].re;
-        double B = (X2[i].re + X2[i].im) * X1[i].im;
-        double C = (X1[i].im - X1[i].re) * X2[i].im;
-        Y[i].re = A - B;
-        Y[i].im = B - C;
-    }
-    ComplexNum* y = IFFT(Y, fftLen);
-    memcpy(output, y, sizeof(ComplexNum) * convOutLen);
 
-    free(x1);
-    free(x2);
-    free(X1);
-    free(X2);
-    free(Y);
-    free(y);
-    return;
-}
 void SegFFTConvComplex(ComplexNum* output, ComplexNum* input1, int inputLen1, ComplexNum* input2, int inputLen2){
     ComplexNum* in1;
     ComplexNum* in2;
     int n1, n2;
+    // 1) set in1 as the longer one, in2 as the shorter one.
     if (inputLen1 > inputLen2) {
         in1 = input1;
         in2 = input2;
@@ -88,180 +61,107 @@ void SegFFTConvComplex(ComplexNum* output, ComplexNum* input1, int inputLen1, Co
         n1 = inputLen2;
         n2 = inputLen1;
     }
-    int convOutLen = n1 + n2 - 1;
-    int fftLen = CalcFFTSize(2 * n2 - 1);
-    int block = fftLen + 1 - n2;
+
+    // 2) choose the fftSize, and split the in1 by length of block.
+    int fftSize;
+    SegFFTConvComplexity(&fftSize, n1, n2);
+    int block = fftSize + 1 - n2;
     int segs = (int)ceil((double)n1 / (double)block);
 
-    ComplexNum* x1 = (ComplexNum *)calloc(fftLen, sizeof(ComplexNum));
-    ComplexNum* x2 = (ComplexNum *)calloc(fftLen, sizeof(ComplexNum));
-    memcpy(x2, input2, sizeof(ComplexNum) * inputLen2);
-    ComplexNum* X2 = FFT(x2, fftLen);
-    ComplexNum* Y = (ComplexNum *)calloc(fftLen, sizeof(ComplexNum));
-    int outTmpLen = segs*block+n2-1;
-    ComplexNum* outTmp = (ComplexNum *)calloc(outTmpLen, sizeof(ComplexNum));
-    ComplexNum* outTmpPtr = outTmp;
-    int curIn1Idx = 0;
-    for (int i = 0; i < segs; i++) {
-        if (curIn1Idx + block < n1) {
-            memcpy(x1, in1 + curIn1Idx, sizeof(ComplexNum) * block);
-            memset(x1 + block, 0, sizeof(ComplexNum) * (fftLen - block));
-        }
-        else{
-            memcpy(x1, in1 + curIn1Idx, sizeof(ComplexNum) * (n1 - curIn1Idx));
-            memset(x1 + n1 - curIn1Idx, 0, sizeof(ComplexNum) * (fftLen - n1 + curIn1Idx));
-        }
-        ComplexNum* X1 = FFT(x1, fftLen);
-        for (int i = 0; i < fftLen; i++) {
-            double A = (X1[i].re + X1[i].im) * X2[i].re;
-            double B = (X2[i].re + X2[i].im) * X1[i].im;
-            double C = (X1[i].im - X1[i].re) * X2[i].im;
-            Y[i].re = A - B;
-            Y[i].im = B - C;
-        }
-        ComplexNum* y = IFFT(Y ,fftLen);
-        ComplexNum* yPtr = y;
-        for (int i = 0; i < fftLen-block; i++) {
-            outTmpPtr[i].re += y[i].re;
-            outTmpPtr[i].im += y[i].im;
-        }
-        memcpy(&outTmpPtr[fftLen-block], &y[fftLen-block], sizeof(ComplexNum) * block);
-        outTmpPtr += block;
-        curIn1Idx += block;
-        free(X1);
-        free(y);
-    }
+    // 3) conv.
+    // 3) -0] malloc.
+    int idx = 0;
+    int convOutLen         = n1 + n2 - 1;
+    int convOutLenTmp      = convOutLen + segs * block - n1; // this maybe different with convOutLen.
+    ComplexNum* in1Tmp     = (ComplexNum *)calloc(segs * block, sizeof(ComplexNum));
+    ComplexNum* X1         = (ComplexNum *)malloc(fftSize * sizeof(ComplexNum));
+    ComplexNum* X2         = (ComplexNum *)calloc(fftSize, sizeof(ComplexNum));
+    ComplexNum* Y          = (ComplexNum *)malloc(fftSize * sizeof(ComplexNum));
+    ComplexNum* y          = (ComplexNum *)malloc(fftSize * sizeof(ComplexNum));
+    ComplexNum* convOutTmp = (ComplexNum *)calloc(convOutLenTmp, sizeof(ComplexNum));
 
-    memcpy(output, outTmp, sizeof(ComplexNum) * convOutLen);
-    free(x1);
-    free(x2);
+    // this can be considered usede parallel for.
+    memcpy(in1Tmp, in1, n1 * sizeof(ComplexNum));
+    memcpy(X2, in2, n2 * sizeof(ComplexNum));
+    FFT(X2, X2, fftSize);
+    for (int segCnt = 0; segCnt < segs; segCnt++) {
+        // 3) -1] Input fft.
+        memset(X1, 0, fftSize * sizeof(ComplexNum));
+        memcpy(X1, in1Tmp + idx, block * sizeof(ComplexNum));
+        FFT(X1, X1, fftSize);
+
+        // 3) -2] Frequency domain multiplication.
+        double mulTmpA, mulTmpB, mulTmpC;
+        for (int i = 0; i < fftSize; i++) {
+            mulTmpA = (X1[i].re + X1[i].im) * X2[i].re;
+            mulTmpB = (X2[i].re + X2[i].im) * X1[i].im;
+            mulTmpC = (X1[i].im - X1[i].re) * X2[i].im;
+            Y[i].re = mulTmpA - mulTmpB;
+            Y[i].im = mulTmpB - mulTmpC;
+        }
+
+        // 3) -3] output ifft.
+        IFFT(y, Y, fftSize);
+
+        // 3) -4] Combine.
+        ComplexNum* ptr1 = convOutTmp + idx;
+        ComplexNum* ptr2 = y;
+        for (int i = 0; i < fftSize; i++) {
+            (*ptr1).re += (*ptr2).re;
+            (*ptr1).im += (*ptr2).im;
+            ptr1++;
+            ptr2++;
+        }
+        idx += block;
+    }
+    memcpy(output, convOutTmp, sizeof(ComplexNum) * convOutLen);
+
+    free(in1Tmp);
+    free(X1);
     free(X2);
     free(Y);
-    free(outTmp);
-}
-int CalcFFTSize(int InputLen){
-    int FFTLen = 1 << (int)ceil((log(InputLen)/log(2)));
-    return FFTLen;
-}
+    free(y);
+    free(convOutTmp);
 
-
-void Filter(double* pdB, double* pdA, double* pdTxSignal, int ulTxSignalLen, int ulBLen, int ulALen){
-    double* pdRxSignal;
-    int ulIndex0, ulIndex1;
-    int ulMinLen, ulMaxLen;
-    pdRxSignal = (double *)malloc(ulTxSignalLen * sizeof(double));
-
-    if(ulBLen > ulALen){
-        ulMinLen = ulALen;
-        ulMaxLen = ulBLen;
-    }
-    else {
-        ulMinLen = ulBLen;
-        ulMaxLen = ulALen;
-
-    }
-    for (ulIndex0 = 0; ulIndex0 < ulMaxLen; ulIndex0++) {
-        pdRxSignal[ulIndex0] = pdB[0] * pdTxSignal[ulIndex0];
-        for ( ulIndex1 = 1; ulIndex1 < ulIndex0 + 1; ulIndex1++) {
-            if (ulIndex0 < ulMinLen) {
-                pdRxSignal[ulIndex0] += pdB[ulIndex1] * pdTxSignal[ulIndex0 - ulIndex1] - pdA[ulIndex1] * pdRxSignal[ulIndex0 - ulIndex1];
-            }
-            else {
-                if (ulBLen < ulALen) {
-                    pdRxSignal[ulIndex0] += - pdA[ulIndex1] * pdRxSignal[ulIndex0 - ulIndex1];
-                }
-                else if(ulBLen > ulALen){
-                    pdRxSignal[ulIndex0] += pdB[ulIndex1] * pdTxSignal[ulIndex0 - ulIndex1];
-                }
-                else {
-                }
-            }
-        }
-    }
-    for ( ; ulIndex0 < ulTxSignalLen; ulIndex0++) {
-        pdRxSignal[ulIndex0] = pdB[0] * pdTxSignal[ulIndex0];
-        for (ulIndex1 = 1; ulIndex1 < ulMaxLen; ulIndex1++) {
-            if (ulIndex0 < ulMinLen) {
-                pdRxSignal[ulIndex0] += pdB[ulIndex1] * pdTxSignal[ulIndex0 - ulIndex1] - pdA[ulIndex1] * pdRxSignal[ulIndex0 - ulIndex1];
-            }
-            else {
-                if (ulBLen < ulALen) {
-                    pdRxSignal[ulIndex0] += - pdA[ulIndex1] * pdRxSignal[ulIndex0 - ulIndex1];
-                }
-                else if(ulBLen > ulALen){
-                    pdRxSignal[ulIndex0] += pdB[ulIndex1] * pdTxSignal[ulIndex0 - ulIndex1];
-                }
-                else {
-                }
-            }
-        }
-
-    }
-
-    for (int i = 0; i < ulTxSignalLen; i++) {
-        pdTxSignal[i] = pdRxSignal[i];
-    }
-    free(pdRxSignal);
     return;
 }
-void ReFilter(double* pdB, double* pdA, double* pdTxSignal, int ulTxSignalLen, int ulBLen, int ulALen){
-    double* pdRxSignal;
-    int ulIndex0, ulIndex1;
-    int ulMinLen, ulMaxLen;
-    pdRxSignal = (double *)malloc(ulTxSignalLen * sizeof(double));
 
-    if(ulBLen > ulALen){
-        ulMinLen = ulALen;
-        ulMaxLen = ulBLen;
+enum convMethod FindBestConvMethod(int n1, int n2){
+    int c1 = DirectConvComplexity(n1, n2);
+    int bestFFTSize;
+    int c2 = SegFFTConvComplexity(&bestFFTSize, n1, n2);
+    return (c2 < c1)?segFFTConv:directConv;
+}
+int DirectConvComplexity(int n1, int n2){
+    return n1 * n2;
+}
+int SegFFTConvComplexity(int* bestFFTSize, int n1, int n2){
+    if (n1 < n2) {
+        int tmp = n1;
+        n1 = n2;
+        n2 = tmp;
     }
-    else {
-        ulMinLen = ulBLen;
-        ulMaxLen = ulALen;
-
-    }
-    int convOutLen = ulBLen + ulTxSignalLen - 1;
-    double* convOut = (double *)calloc(convOutLen, sizeof(double));
-    DirectConv(convOut, pdB, ulBLen, pdTxSignal, ulTxSignalLen);
-    memcpy(pdRxSignal, convOut, sizeof(double) * ulTxSignalLen);
-
-    free(convOut);
-    for (ulIndex0 = 0; ulIndex0 < ulMaxLen; ulIndex0++) {
-        for ( ulIndex1 = 1; ulIndex1 < ulIndex0 + 1; ulIndex1++) {
-            if (ulIndex0 < ulMinLen) {
-                pdRxSignal[ulIndex0] += - pdA[ulIndex1] * pdRxSignal[ulIndex0 - ulIndex1];
-            }
-            else {
-                if (ulBLen < ulALen) {
-                    pdRxSignal[ulIndex0] += - pdA[ulIndex1] * pdRxSignal[ulIndex0 - ulIndex1];
-                }
-                else if(ulBLen > ulALen){
-                }
-                else {
-                }
-            }
+    int minFFTOrder = CalcFFTOrder(1+n2-1);
+    int maxFFTOrder = CalcFFTOrder(n1+n2-1);
+    int c = INT_MAX; // times of multiply
+    *bestFFTSize = CalcFFTLen(1+n2-1);
+    int fftOrder = minFFTOrder;
+    while (fftOrder <= maxFFTOrder) {
+        // 1) calc depart of n1.
+        int fftSize = 1 << fftOrder;
+        int block = fftSize + 1 - n2; // n1 was depart by length of block.
+        int segs = ceil(n1 / block); // n1 was depart into n(segs) blocks.
+        // 2) find the min complexity.
+        int doubleMulPerComplexMul = 3;
+        int totalFFTTimes = 2 * segs + 1;
+        int cPerFFT = (fftSize * fftOrder) >> 1;
+        int complexMulTimes = segs * fftSize;
+        int complexity = doubleMulPerComplexMul * (totalFFTTimes * cPerFFT + complexMulTimes);
+        if (complexity < c) {
+            c = complexity;
+            *bestFFTSize = fftSize;
         }
+        fftOrder++;
     }
-    for ( ; ulIndex0 < ulTxSignalLen; ulIndex0++) {
-        for (ulIndex1 = 1; ulIndex1 < ulMaxLen; ulIndex1++) {
-            if (ulIndex0 < ulMinLen) {
-                pdRxSignal[ulIndex0] += - pdA[ulIndex1] * pdRxSignal[ulIndex0 - ulIndex1];
-            }
-            else {
-                if (ulBLen < ulALen) {
-                    pdRxSignal[ulIndex0] += - pdA[ulIndex1] * pdRxSignal[ulIndex0 - ulIndex1];
-                }
-                else if(ulBLen > ulALen){
-                }
-                else {
-                }
-            }
-        }
-
-    }
-
-    for (int i = 0; i < ulTxSignalLen; i++) {
-        pdTxSignal[i] = pdRxSignal[i];
-    }
-    free(pdRxSignal);
-    return;
+    return c;
 }

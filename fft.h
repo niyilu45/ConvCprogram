@@ -21,37 +21,28 @@ typedef struct ComplexNum{
 
 typedef struct OmegaLibNode* OmegaLibList;
 typedef struct OmegaLibNode{
-    OmegaLibList Next;
-    int Len;
-    ComplexNum* Omega;
+    OmegaLibList next;
+    int len;
+    ComplexNum* omega;
 }OmegaLibNode;
 
 
-//int CalFFTLen(int InputLen);
-ComplexNum* FFT(ComplexNum* Input, int InputLen);
-ComplexNum* IFFT(ComplexNum* Input, int InputLen);
+int CalcFFTLen(int InputLen);
+int CalcFFTOrder(int InputLen);
 void ClearOmegaLib(void); // After FFT, should clear lib.
+void FFT(ComplexNum* output, ComplexNum* input, int inputLen);
+void IFFT(ComplexNum* output, ComplexNum* input, int inputLen);
 
 
-
-static ComplexNum CalOmega(int i, int N);
-static ComplexNum ComplexAddInFFT(ComplexNum A, ComplexNum B);
-static ComplexNum ComplexSubInFFT(ComplexNum A, ComplexNum B);
-static ComplexNum ComplexMulInFFT(ComplexNum A, ComplexNum B);
-static ComplexNum* FFTDataFlip(ComplexNum* Input, int InputLen);
+static void FFTDataFlip(ComplexNum* input, int inputLen);
+static int CalcFFTStateNum(int inputLen);
 static unsigned int BitFlipInt(register unsigned int val, int BitWidth);
-static int CalFFTStateNum(int InputLen);
 
 // Omega Lib
-static OmegaLibList FindOmegaLib(int FFTLen, OmegaLibList Head);
-static OmegaLibList InsertOmegaLib(int FFTLen, OmegaLibList Head);
-static ComplexNum* CalcOmegaLib(int FFTLen);
+static void InsertOmegaLib(OmegaLibList L, int fftLen);
+static OmegaLibList FindOmegaLib(int fftLen, OmegaLibList head);
+static ComplexNum CalcOmega(int i, int N);
+static void CalcOmegaLib(ComplexNum* omega, int len);
 static OmegaLibList DestroyOmegaLib(OmegaLibList L);
 
-
-void ConvDouble(double* output, double* input);
-void DirectConv(double* output, double* input1, int inputLen1, double* input2, int inputLen2);
-void FFTConvComplex(ComplexNum* output, ComplexNum* input1, int inputLen1, ComplexNum* input2, int inputLen2);
-void SegFFTConvComplex(ComplexNum* output, ComplexNum* input1, int inputLen1, ComplexNum* input2, int inputLen2);
-int CalFFTLen(int len);
 #endif
