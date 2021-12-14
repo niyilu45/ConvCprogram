@@ -1,33 +1,38 @@
 #include "conv.h"
 // This part is for Conv
-void ConvDouble(double* output, double* input){
-    int len1 = 11;
-    int len2 = 4;
-    int convOutLen = len1 + len2 - 1;
-    double in1[] = {0.1419        , 0.4218 , 0.9157 , 0.7922   , 0.9595 , 0.6557
-                                      , 0.0357 , 0.8491 , 0.9340   , 0.6787 , 0.7577};
-    double in2[] = {0.7431        , 0.3922 , 0.6555 , 0.1712};
-    ComplexNum* cin1 = (ComplexNum *)calloc(len1, sizeof(ComplexNum));
-    ComplexNum* cin2 = (ComplexNum *)calloc(len2, sizeof(ComplexNum));
-    ComplexNum* out = (ComplexNum *)calloc(convOutLen, sizeof(ComplexNum));
-    for (int i = 0; i < len1; i++) {
-        cin1[i].re = in1[i];
+void ConvDouble(double* output, double* input1, int inputLen1, double* input2, int inputLen2){
+    int convOutLen = inputLen1 + inputLen2 - 1;
+    enum convMethod bestMethod = FindBestConvMethod(inputLen1, inputLen2);
+    bestMethod = segFFTConv;
+    ComplexNum* cIn1;
+    ComplexNum* cIn2;
+    ComplexNum* cOut;
+    switch (bestMethod) {
+        case directConv:
+            DirectConv(output, input1, inputLen1, input2, inputLen2);
+            break;
+        case segFFTConv:
+            cIn1 = (ComplexNum *)calloc(inputLen1, sizeof(ComplexNum));
+            cIn2 = (ComplexNum *)calloc(inputLen2, sizeof(ComplexNum));
+            cOut = (ComplexNum *)malloc(convOutLen * sizeof(ComplexNum));
+            for (int i = 0; i < inputLen1; i++) {
+                cIn1[i].re = input1[i];
+            }
+            for (int i = 0; i < inputLen2; i++) {
+                cIn2[i].re = input2[i];
+            }
+            SegFFTConvComplex(cOut, cIn1, inputLen1, cIn2, inputLen2);
+            for (int i = 0; i < convOutLen; i++) {
+                output[i] = cOut[i].re;
+            }
+            free(cIn1);
+            free(cIn2);
+            free(cOut);
+            break;
+        default:
+            printf("[Error] in %s. Do not have this method!\n", __func__);
+            exit(0);
     }
-    for (int i = 0; i < len2; i++) {
-        cin2[i].re = in2[i];
-    }
-
-    /*DirectConv(out, cin1, len1, cin2, len2);*/
-    /*FFTConvComplex(out, cin1, len1, cin2, len2);*/
-    SegFFTConvComplex(out, cin1, len1, cin2, len2);
-
-    for (int i = 0; i < convOutLen; i++) {
-        printf("cout[%d].re = %.4f\n", i, out[i].re);
-    }
-
-    free(out);
-    free(cin1);
-    free(cin2);
     return;
 }
 void DirectConv(double* output, double* input1, int inputLen1, double* input2, int inputLen2){

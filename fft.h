@@ -39,7 +39,7 @@ static int CalcFFTStateNum(int inputLen);
 static unsigned int BitFlipInt(register unsigned int val, int BitWidth);
 
 // Omega Lib
-static void InsertOmegaLib(OmegaLibList L, int fftLen);
+static OmegaLibList InsertOmegaLib(OmegaLibList L, int fftLen);
 static OmegaLibList FindOmegaLib(int fftLen, OmegaLibList head);
 static ComplexNum CalcOmega(int i, int N);
 static void CalcOmegaLib(ComplexNum* omega, int len);

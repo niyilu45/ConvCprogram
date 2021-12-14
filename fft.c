@@ -20,7 +20,7 @@ void FFT(ComplexNum* output, ComplexNum* input, int inputLen){
     ComplexNum* omega;
     OmegaLibList curOmegaLib;
 
-    InsertOmegaLib(omegaLib, fftLen);
+    omegaLib = InsertOmegaLib(omegaLib, fftLen);
     curOmegaLib = FindOmegaLib(fftLen, omegaLib);
     omega = curOmegaLib->omega;
 
@@ -87,6 +87,7 @@ void IFFT(ComplexNum* output, ComplexNum* input, int inputLen){
     }
 
     FFT(inputTmp, inputTmp, fftLen);
+    memcpy(output, inputTmp, fftLen * sizeof(ComplexNum));
 
     for(int i=0;i<fftLen;i++){
         output[i].re /= fftLen;
@@ -112,14 +113,15 @@ static void FFTDataFlip(ComplexNum* input, int inputLen){
     int BitWidth = CalcFFTStateNum(inputLen);
     unsigned int idx;
 
-    ComplexNum tmp;
-    for(int i=0;i<=inputLen/2;i++){
+    ComplexNum* outputTmp = (ComplexNum *)malloc(inputLen * sizeof(ComplexNum));
+    
+    for(int i=0;i<inputLen;i++){
         idx = BitFlipInt(i, BitWidth);
-        tmp = input[i];
-        input[i] = input[idx];
-        input[idx] = tmp;
+        outputTmp[idx] = input[i];
     }
 
+    memcpy(input, outputTmp, inputLen * sizeof(ComplexNum));
+    free(outputTmp);
     return;
 }
 
@@ -152,7 +154,7 @@ static OmegaLibList FindOmegaLib(int fftLen, OmegaLibList head){
     return NULL;
 }
 
-static void InsertOmegaLib(OmegaLibList L, int fftLen){
+static OmegaLibList InsertOmegaLib(OmegaLibList L, int fftLen){
     // 1) if find the end of the list, create new.
     if(L == NULL){
         L = (OmegaLibList)calloc(1, sizeof(OmegaLibNode));
@@ -160,17 +162,17 @@ static void InsertOmegaLib(OmegaLibList L, int fftLen){
         L->len = fftLen;
         L->omega = (ComplexNum *)malloc(fftLen * sizeof(ComplexNum));
         CalcOmegaLib(L->omega, fftLen);
-        return;
+        return L;
     }
 
     // 2) if this len is already exist, skip.
     if(L->len == fftLen){
-        return;
+        return L;
     }
 
     // 3) find next list node.
-    InsertOmegaLib(L->next, fftLen);
-    return;
+    L->next = InsertOmegaLib(L->next, fftLen);
+    return L;
 }
 
 static void CalcOmegaLib(ComplexNum* omega, int len){
@@ -201,6 +203,7 @@ void ClearOmegaLib(void){
 
 static int CalcFFTStateNum(int inputLen){
     int stateNum = 0;
+    inputLen--;
     while (inputLen) {
         inputLen >>= 1;
         stateNum++;
@@ -210,6 +213,7 @@ static int CalcFFTStateNum(int inputLen){
 
 int CalcFFTOrder(int inputLen){
     int fftOrder = 0;
+    inputLen--;
     while (inputLen) {
         inputLen >>= 1;
         fftOrder++;
@@ -219,6 +223,7 @@ int CalcFFTOrder(int inputLen){
 
 int CalcFFTLen(int inputLen){
     int fftOrder = 0;
+    inputLen--;
     while (inputLen) {
         inputLen >>= 1;
         fftOrder++;

@@ -13,10 +13,7 @@ int main(int argc, char* argv[])
     double* in1;
     double* in2;
     double* out;
-    printf("FFTSize=%d\n", CalcFFTStateNum(511));
 
-
-    return 0;
     len1 = FileReadDouble(&in1, "SeqConvInA.txt");
     len2 = FileReadDouble(&in2, "SeqConvInB.txt");
     len3 = FileReadDouble(&out, "SeqConvOutC.txt");
@@ -31,11 +28,11 @@ int main(int argc, char* argv[])
     }
     double* out1 = (double *)calloc(convOutLen, sizeof(double));
     ComplexNum* out2 = (ComplexNum *)calloc(convOutLen, sizeof(ComplexNum));
-    ComplexNum* out3 = (ComplexNum *)calloc(convOutLen, sizeof(ComplexNum));
+    double* out3 = (double *)calloc(convOutLen, sizeof(double));
 
     DirectConv(out1, in1, len1, in2, len2);
-    FFTConvComplex(out2, cIn1, len1, cIn2, len2);
-    SegFFTConvComplex(out3, cIn1, len1, cIn2, len2);
+    SegFFTConvComplex(out2, cIn1, len1, cIn2, len2);
+    ConvDouble(out3, in1, len1, in2, len2);
     double maxDiff1 = 0;
     double maxDiff2 = 0;
     double maxDiff3 = 0;
@@ -49,7 +46,7 @@ int main(int argc, char* argv[])
         if (diff > maxDiff2) {
             maxDiff2 = diff;
         }
-        diff = abs(out[i] - out3[i].re);
+        diff = abs(out[i] - out3[i]);
         if (diff > maxDiff3) {
             maxDiff3 = diff;
         }
@@ -58,17 +55,6 @@ int main(int argc, char* argv[])
     printf("maxDiff2=%f\n", maxDiff2);
     printf("maxDiff3=%f\n", maxDiff3);
 
-
-    double* in4;
-    int len4 = FileReadDouble(&in4, "SeqConvInD.txt");
-    for (int i = 0; i < 20; i++) {
-        printf("in4[%d]=%f\n",i,in4[i]);
-    }
-    double* in5;
-    int len5 = FileReadDouble(&in5, "SeqConvInD.txt");
-    for (int i = 0; i < 20; i++) {
-        printf("in5[%d]=%f\n",i,in5[i]);
-    }
 
     free(cIn1);
     free(cIn2);
@@ -89,7 +75,7 @@ int FileReadDouble(double** out, char* fileName){
         exit(0);
     }
     fseek(Fid, 0, SEEK_END); // Move to the end of file.
-    RawDataLen = ftell(Fid) / sizeof(double); // ftell return size by bytes.
+    RawDataLen = ftell(Fid) / 8; // ftell return size by bytes.
     RawDataLen--;
     rewind(Fid); // Move to the start of file to read data.
     if(RawDataLen <= 0){ // the raw file has no data.

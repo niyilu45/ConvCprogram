@@ -6,7 +6,7 @@ enum convMethod {
     directConv = 0,
     segFFTConv
 };
-void ConvDouble(double* output, double* input);
+void ConvDouble(double* output, double* input1, int inputLen1, double* input2, int inputLen2);
 enum convMethod FindBestConvMethod(int n1, int n2);
 void DirectConv(double* output, double* input1, int inputLen1, double* input2, int inputLen2);
 void SegFFTConvComplex(ComplexNum* output, ComplexNum* input1, int inputLen1, ComplexNum* input2, int inputLen2);
